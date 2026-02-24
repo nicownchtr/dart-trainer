@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dart Trainer</title>
+
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#111"/>
+
+<style>
+body{
+    margin:0;
+    font-family:Arial;
+    background:#111;
+    color:white;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+}
+canvas{
+    background:#ddd;
+    touch-action:none;
+    max-width:95vw;
+}
+#numbers{
+    display:grid;
+    grid-template-columns:repeat(5,60px);
+    gap:8px;
+    margin-top:15px;
+}
+.slot{
+    width:60px;
+    height:60px;
+    border:2px dashed #555;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+}
+.number{
+    background:#eee;
+    color:black;
+    width:100%;
+    height:100%;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    font-weight:bold;
+    cursor:grab;
+}
+button{
+    margin-top:12px;
+    padding:10px;
+    width:100%;
+    max-width:300px;
+}
+.active{background:red;color:white;}
+</style>
+</head>
+<body>
+
+<canvas id="board"></canvas>
+
+<div id="numbers"></div>
+
+<button id="trainingBtn">Training</button>
+<button id="hardcoreBtn">Hardcore</button>
+<button id="resetBtn">Reset</button>
+
+<script src="app.js"></script>
+<script>
+if('serviceWorker' in navigator){
+    navigator.serviceWorker.register('sw.js');
+}
+</script>
+
+</body>
+</html>
