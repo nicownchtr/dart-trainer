@@ -5,6 +5,8 @@ let size=Math.min(window.innerWidth*0.95,600);
 canvas.width=size;
 canvas.height=size;
 
+const isMobile = window.innerWidth < 768;
+
 const center=size/2;
 const sectorAngle=(2*Math.PI)/20;
 const rotationOffset=-Math.PI/2 - sectorAngle/2;
@@ -16,8 +18,8 @@ let locked=new Array(20).fill(false);
 
 let training=false;
 let hardcore=false;
-let hardcoreTargets=[];
 
+let selectedNumber=null;
 let pulse=0;
 
 const radii={
@@ -45,27 +47,38 @@ function draw(){
   const start=rotationOffset+i*sectorAngle;
   const end=start+sectorAngle;
 
-  const base=i%2===0?"black":"white";
-  const ring=i%2===0?"red":"green";
+  const baseColor=i%2===0?"#d6d6d6":"#bcbcbc"; // gris clair / gris plus foncé
+  const ringColor=i%2===0?"#cc0000":"#008000";
 
   if(training && assignments[i]===official[i]){
-    ctx.save();
-    ctx.shadowColor="rgba(0,150,255,1)";
-    ctx.shadowBlur=50+20*Math.sin(pulse);
-    drawSegment(radii.outer,0,start,end,"rgba(0,0,0,0.001)");
-    ctx.restore();
+   ctx.save();
+   ctx.shadowColor="rgba(0,150,255,1)";
+   ctx.shadowBlur=50+20*Math.sin(pulse);
+   drawSegment(radii.outer,0,start,end,"rgba(0,0,0,0.001)");
+   ctx.restore();
   }
 
-  drawSegment(radii.inner,0,start,end,base);
-  drawSegment(radii.tripleOuter,radii.tripleInner,start,end,ring);
-  drawSegment(radii.doubleOuter,radii.doubleInner,start,end,ring);
+  // alternance pleine zone centre → inner
+  drawSegment(radii.inner,0,start,end,baseColor);
+
+  // triple
+  drawSegment(radii.tripleOuter,radii.tripleInner,start,end,ringColor);
+
+  // entre inner et triple
+  drawSegment(radii.tripleInner,radii.inner,start,end,baseColor);
+
+  // double
+  drawSegment(radii.doubleOuter,radii.doubleInner,start,end,ringColor);
+
+  // entre triple et double
+  drawSegment(radii.doubleInner,radii.tripleOuter,start,end,baseColor);
 
   if(assignments[i]){
-    drawNumber(assignments[i],start,base);
+   drawNumber(assignments[i],start,baseColor);
   }
 
   if(training && !assignments[i]){
-    drawGhost(official[i],start,base);
+   drawGhost(official[i],start,baseColor);
   }
  }
 
@@ -86,24 +99,26 @@ function drawNumber(num,start,base){
  const a=start+sectorAngle/2;
  const x=center+Math.cos(a)*center*0.7;
  const y=center+Math.sin(a)*center*0.7;
- ctx.fillStyle=base==="black"?"white":"black";
- ctx.font=center*0.08+"px Arial";
+
+ ctx.fillStyle="#000";
+ ctx.font=(isMobile?center*0.055:center*0.08)+"px Arial";
  ctx.fillText(num,x-10,y+8);
 }
 
-function drawGhost(num,start,base){
+function drawGhost(num,start){
  const a=start+sectorAngle/2;
  const x=center+Math.cos(a)*center*0.7;
  const y=center+Math.sin(a)*center*0.7;
+
  ctx.globalAlpha=0.25;
- ctx.fillStyle=base==="black"?"white":"black";
- ctx.font=center*0.08+"px Arial";
+ ctx.fillStyle="#000";
+ ctx.font=(isMobile?center*0.055:center*0.08)+"px Arial";
  ctx.fillText(num,x-10,y+8);
  ctx.globalAlpha=1;
 }
 
 function drawSeparators(){
- ctx.strokeStyle="#333";
+ ctx.strokeStyle="#777";
  for(let r of [radii.doubleOuter,radii.doubleInner,radii.tripleOuter,radii.tripleInner,radii.bullOuter]){
   ctx.beginPath();
   ctx.arc(center,center,r,0,2*Math.PI);
@@ -122,11 +137,42 @@ function drawSeparators(){
 function drawBull(){
  ctx.beginPath();
  ctx.arc(center,center,radii.bullOuter,0,2*Math.PI);
- ctx.fillStyle="green"; ctx.fill();
+ ctx.fillStyle="#008000"; ctx.fill();
  ctx.beginPath();
  ctx.arc(center,center,radii.bullInner,0,2*Math.PI);
- ctx.fillStyle="red"; ctx.fill();
+ ctx.fillStyle="#cc0000"; ctx.fill();
 }
+
+function getSector(x,y){
+ const angle=Math.atan2(y,x);
+ let adj=angle-rotationOffset;
+ if(adj<0) adj+=2*Math.PI;
+ return Math.floor(adj/sectorAngle);
+}
+
+canvas.addEventListener("click",e=>{
+ const rect=canvas.getBoundingClientRect();
+ const x=e.clientX-rect.left-center;
+ const y=e.clientY-rect.top-center;
+
+ const sector=getSector(x,y);
+
+ if(selectedNumber!==null){
+  if(hardcore && official[sector]!==selectedNumber){
+   if(navigator.vibrate) navigator.vibrate(200);
+   return;
+  }
+  assignments[sector]=selectedNumber;
+  removeFromList(selectedNumber);
+  selectedNumber=null;
+  return;
+ }
+
+ if(assignments[sector]){
+  returnToList(assignments[sector]);
+  assignments[sector]=null;
+ }
+});
 
 const numbersDiv=document.getElementById("numbers");
 
@@ -140,9 +186,12 @@ function initNumbers(){
   const num=document.createElement("div");
   num.className="number";
   num.textContent=i;
-  num.draggable=true;
 
-  num.ondragstart=e=>e.dataTransfer.setData("text",i);
+  num.onclick=()=>{
+   selectedNumber=i;
+   document.querySelectorAll(".number").forEach(n=>n.style.background="#eee");
+   num.style.background="#00aaff";
+  };
 
   slot.appendChild(num);
   numbersDiv.appendChild(slot);
@@ -160,56 +209,13 @@ function returnToList(num){
   const n=document.createElement("div");
   n.className="number";
   n.textContent=num;
-  n.draggable=true;
-  n.ondragstart=e=>e.dataTransfer.setData("text",num);
+  n.onclick=()=>{
+   selectedNumber=num;
+   document.querySelectorAll(".number").forEach(n=>n.style.background="#eee");
+   n.style.background="#00aaff";
+  };
   slot.appendChild(n);
  }
-}
-
-canvas.ondragover=e=>e.preventDefault();
-
-canvas.ondrop=e=>{
- e.preventDefault();
- const num=parseInt(e.dataTransfer.getData("text"));
- handlePlacement(num,e.clientX,e.clientY);
-};
-
-canvas.onclick=e=>{
- const rect=canvas.getBoundingClientRect();
- const x=e.clientX-rect.left-center;
- const y=e.clientY-rect.top-center;
- const sector=getSector(x,y);
- if(assignments[sector] && !locked[sector]){
-  returnToList(assignments[sector]);
-  assignments[sector]=null;
- }
-};
-
-function handlePlacement(num,clientX,clientY){
- const rect=canvas.getBoundingClientRect();
- const x=clientX-rect.left-center;
- const y=clientY-rect.top-center;
- const sector=getSector(x,y);
-
- if(locked[sector]) return;
-
- if(hardcore){
-  if(official[sector]!==num){
-   if(navigator.vibrate) navigator.vibrate(200);
-   return;
-  }
-  locked[sector]=true;
- }
-
- assignments[sector]=num;
- removeFromList(num);
-}
-
-function getSector(x,y){
- const angle=Math.atan2(y,x);
- let adj=angle-rotationOffset;
- if(adj<0) adj+=2*Math.PI;
- return Math.floor(adj/sectorAngle);
 }
 
 trainingBtn.onclick=()=>{
@@ -221,24 +227,14 @@ hardcoreBtn.onclick=()=>{
  hardcore=!hardcore;
  hardcoreBtn.classList.toggle("active");
  assignments.fill(null);
- locked.fill(false);
- if(hardcore){
-  hardcoreTargets=[...official].sort(()=>0.5-Math.random()).slice(0,5);
-  initNumbers();
-  [...numbersDiv.children].forEach(s=>{
-   if(!hardcoreTargets.includes(parseInt(s.dataset.value)))
-    s.innerHTML="";
-  });
- }else{
-  initNumbers();
- }
+ initNumbers();
 };
 
 resetBtn.onclick=()=>{
  assignments.fill(null);
- locked.fill(false);
  training=false;
  hardcore=false;
+ selectedNumber=null;
  trainingBtn.classList.remove("active");
  hardcoreBtn.classList.remove("active");
  initNumbers();
